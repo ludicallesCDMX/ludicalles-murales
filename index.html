@@ -1,0 +1,923 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ludicalles - Taller de Murales Infantiles</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        h1, h2, .font-playful { font-family: 'Fredoka', sans-serif; }
+        .canvas-container { touch-action: none; user-select: none; }
+    </style>
+</head>
+<body class="bg-sky-50 text-slate-800 min-h-screen flex flex-col">
+
+    <header class="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-500 text-white shadow-md sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-11 h-11 rounded-2xl bg-amber-300 text-indigo-900 flex items-center justify-center font-bold text-xl shadow-sm transform -rotate-3">
+                    <i class="fa-solid fa-palette"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-xl sm:text-2xl leading-tight tracking-wide">Ludicalles</h1>
+                    <p class="text-xs text-purple-100 font-medium hidden sm:block">Taller Comunitario de Murales Infantiles - Coyoacán</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center space-x-2">
+                <label for="imageUpload" class="cursor-pointer bg-white/20 hover:bg-white/30 text-white font-bold py-2 px-3 rounded-xl text-xs sm:text-sm flex items-center space-x-1.5 border border-white/30 transition">
+                    <i class="fa-solid fa-camera"></i>
+                    <span>Subir Fachada</span>
+                </label>
+                <input type="file" id="imageUpload" accept="image/*" class="hidden">
+
+                <button id="btnExport" class="bg-amber-300 hover:bg-amber-200 text-indigo-950 font-extrabold py-2 px-3 rounded-xl text-xs sm:text-sm flex items-center space-x-1.5 shadow-sm transition">
+                    <i class="fa-solid fa-download"></i>
+                    <span class="hidden sm:inline">Descargar Foto</span>
+                </button>
+
+                <button id="btnAdminAccess" class="bg-indigo-950/70 hover:bg-indigo-950 text-amber-300 font-bold py-2 px-3 rounded-xl text-xs sm:text-sm flex items-center space-x-1.5 border border-amber-300/40 transition">
+                    <i class="fa-solid fa-lock"></i>
+                    <span class="hidden sm:inline">Facilitador</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 max-w-7xl w-full mx-auto p-2 sm:p-4 grid grid-cols-1 lg:grid-cols-12 gap-4">
+        <section class="lg:col-span-8 flex flex-col bg-white rounded-3xl shadow-sm border border-indigo-100 overflow-hidden">
+            <div class="bg-indigo-50/60 border-b border-indigo-100 p-2 sm:p-3 flex flex-wrap items-center justify-between gap-2">
+                <div class="flex flex-wrap items-center bg-white p-1 rounded-2xl gap-1 shadow-2xs border border-indigo-100">
+                    <button id="modePoly" class="mode-btn px-3 py-1.5 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-1.5 transition bg-indigo-600 text-white shadow-xs">
+                        <i class="fa-solid fa-draw-polygon"></i>
+                        <span>1. Delimitar Muro</span>
+                    </button>
+                    <button id="modeDraw" class="mode-btn px-3 py-1.5 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-1.5 transition text-slate-600 hover:text-indigo-700">
+                        <i class="fa-solid fa-paintbrush"></i>
+                        <span>2. Dibujar Mural</span>
+                    </button>
+                    <button id="modeSticker" class="mode-btn px-3 py-1.5 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-1.5 transition text-slate-600 hover:text-indigo-700">
+                        <i class="fa-solid fa-shapes"></i>
+                        <span>3. Sellos y Figuras</span>
+                    </button>
+                </div>
+
+                <div class="flex items-center space-x-1.5">
+                    <button id="btnUndo" class="px-2.5 py-2 text-indigo-700 hover:bg-indigo-100 rounded-xl text-xs font-bold flex items-center space-x-1 transition">
+                        <i class="fa-solid fa-rotate-left"></i>
+                        <span>Deshacer</span>
+                    </button>
+                    <button id="btnClear" class="px-2.5 py-2 text-rose-600 hover:bg-rose-50 rounded-xl text-xs font-bold flex items-center space-x-1 transition">
+                        <i class="fa-solid fa-trash-can"></i>
+                        <span>Limpiar</span>
+                    </button>
+                </div>
+            </div>
+
+            <div id="polyToolbar" class="bg-slate-50 border-b border-slate-200 px-3 py-2 flex flex-col gap-2 text-xs">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div class="flex flex-wrap items-center gap-1.5">
+                        <button id="targetWall" class="px-2.5 py-1 rounded-xl font-bold flex items-center space-x-1.5 bg-indigo-600 text-white shadow-2xs transition">
+                            <span class="w-2.5 h-2.5 rounded-full bg-white"></span>
+                            <span>Área del Mural (Azul)</span>
+                        </button>
+                        <button id="targetHole" class="px-2.5 py-1 rounded-xl font-bold flex items-center space-x-1.5 bg-white text-rose-700 border border-rose-300 hover:bg-rose-50 transition">
+                            <i class="fa-solid fa-border-none"></i>
+                            <span>+ Proteger Ventana/Puerta</span>
+                        </button>
+                    </div>
+
+                    <div class="flex flex-wrap items-center gap-1.5">
+                        <label class="flex items-center space-x-1 text-slate-700 cursor-pointer mr-1 font-semibold">
+                            <input type="checkbox" id="showPolyGuide" checked class="accent-indigo-600 rounded">
+                            <span>Ver líneas guía</span>
+                        </label>
+                        <button id="btnCloseActivePoly" class="bg-amber-400 hover:bg-amber-300 text-slate-900 font-extrabold px-3 py-1 rounded-xl shadow-2xs transition hidden">
+                            <i class="fa-solid fa-check mr-1"></i>Cerrar Muro
+                        </button>
+                        <button id="btnResetPoly" class="bg-white hover:bg-slate-200 text-slate-700 border border-slate-300 font-semibold px-2.5 py-1 rounded-xl transition">
+                            Borrar Límites
+                        </button>
+                    </div>
+                </div>
+
+                <div class="flex items-center space-x-2 text-slate-700 font-medium bg-white px-2.5 py-1 rounded-xl border border-slate-200/80">
+                    <i class="fa-solid fa-wand-magic-sparkles text-indigo-600"></i>
+                    <span id="polyHint">Paso 1: Marca las esquinas de la pared donde dibujarán los niños y pulsa 'Cerrar Muro'.</span>
+                </div>
+            </div>
+
+            <div class="relative bg-slate-800 flex items-center justify-center p-3 overflow-hidden canvas-container min-h-[430px] lg:min-h-[550px]" id="canvasWrapper">
+                <canvas id="mainCanvas" style="max-width: 100%; max-height: 70vh; width: auto; height: auto;" class="shadow-xl rounded-xl cursor-crosshair bg-slate-700"></canvas>
+                
+                <div id="floatingStickerControls" class="absolute top-4 left-1/2 -translate-x-1/2 bg-indigo-950/90 backdrop-blur-md text-white px-3 py-2 rounded-2xl shadow-xl flex items-center space-x-2 hidden z-20 border border-indigo-700">
+                    <button id="quickScaleUp" class="p-2 hover:bg-indigo-800 rounded-lg text-xs font-bold"><i class="fa-solid fa-magnifying-glass-plus"></i></button>
+                    <button id="quickScaleDown" class="p-2 hover:bg-indigo-800 rounded-lg text-xs font-bold"><i class="fa-solid fa-magnifying-glass-minus"></i></button>
+                    <button id="quickRotateLeft" class="p-2 hover:bg-indigo-800 rounded-lg text-xs"><i class="fa-solid fa-rotate-left"></i></button>
+                    <button id="quickRotateRight" class="p-2 hover:bg-indigo-800 rounded-lg text-xs"><i class="fa-solid fa-rotate-right"></i></button>
+                    <button id="quickDuplicate" class="p-2 hover:bg-indigo-800 rounded-lg text-xs text-amber-300"><i class="fa-solid fa-clone"></i></button>
+                    <button id="quickDelete" class="p-2 hover:bg-rose-900/80 rounded-lg text-xs text-rose-400 font-bold"><i class="fa-solid fa-trash-can"></i></button>
+                </div>
+
+                <div class="absolute bottom-3 left-3 bg-indigo-950/85 backdrop-blur text-white text-xs px-3 py-1.5 rounded-full pointer-events-none flex items-center space-x-2 z-10">
+                    <span class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></span>
+                    <span id="canvasStatus">Delimita la pared de la fachada para empezar el mural</span>
+                </div>
+            </div>
+        </section>
+
+        <aside class="lg:col-span-4 flex flex-col space-y-4">
+            <div class="bg-white rounded-3xl p-4 shadow-sm border border-purple-100">
+                <div class="flex items-center justify-between mb-2">
+                    <h2 class="font-bold text-lg text-indigo-950 flex items-center space-x-2">
+                        <i class="fa-solid fa-child-reaching text-pink-500"></i>
+                        <span>Firma tu Mural</span>
+                    </h2>
+                    <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-pink-100 text-pink-700">Paso Final</span>
+                </div>
+
+                <form id="artistForm" class="space-y-2.5 text-xs">
+                    <div>
+                        <label class="block font-bold text-slate-700 mb-1">Tu nombre *</label>
+                        <input type="text" id="artistName" required placeholder="Ej. Sofía Martínez" class="w-full px-3 py-2 rounded-xl border border-slate-300 focus:outline-none focus:border-purple-500 text-sm font-medium">
+                    </div>
+
+                    <div class="grid grid-cols-3 gap-2">
+                        <div>
+                            <label class="block font-semibold text-slate-600 mb-0.5">Edad (opcional)</label>
+                            <input type="number" id="artistAge" min="3" max="17" placeholder="Ej. 8" class="w-full px-2.5 py-1.5 rounded-xl border border-slate-300 focus:outline-none focus:border-purple-500">
+                        </div>
+                        <div class="col-span-2">
+                            <label class="block font-semibold text-slate-600 mb-0.5">Nombre de tu mural</label>
+                            <input type="text" id="muralTitle" placeholder="Ej. El bosque mágico" class="w-full px-2.5 py-1.5 rounded-xl border border-slate-300 focus:outline-none focus:border-purple-500">
+                        </div>
+                    </div>
+
+                    <button type="submit" id="btnSubmitMural" class="w-full py-2.5 px-3 rounded-xl font-extrabold text-xs sm:text-sm flex items-center justify-center space-x-2 bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 text-white shadow-sm transition">
+                        <i class="fa-solid fa-paper-plane"></i>
+                        <span>Guardar y Enviar mi Boceto</span>
+                    </button>
+                </form>
+
+                <div id="regFeedback" class="hidden mt-2.5 text-xs font-semibold px-3 py-2 rounded-xl"></div>
+            </div>
+
+            <div class="bg-white rounded-3xl p-4 shadow-sm border border-indigo-100">
+                <div class="flex items-center justify-between mb-3">
+                    <h2 class="font-bold text-lg text-indigo-950 flex items-center space-x-2">
+                        <i class="fa-solid fa-fill-drip text-amber-500"></i>
+                        <span>Colores y Pinceles</span>
+                    </h2>
+                    <span id="selectedColorName" class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700">Azul Cielo</span>
+                </div>
+
+                <div class="grid grid-cols-6 gap-2 mb-3" id="colorPalette"></div>
+
+                <div class="flex items-center justify-between bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200/80 mb-3">
+                    <span class="text-xs font-semibold text-slate-600">¿Quieres otro color?</span>
+                    <label class="flex items-center space-x-1.5 cursor-pointer text-xs font-bold text-indigo-700">
+                        <input type="color" id="customColorPicker" value="#3b82f6" class="w-6 h-6 rounded cursor-pointer border-0 bg-transparent">
+                        <span>Elegir tono</span>
+                    </label>
+                </div>
+
+                <div class="grid grid-cols-3 gap-1.5 mb-3">
+                    <button id="toolBrush" class="py-2 px-2 rounded-xl text-xs font-bold bg-indigo-600 text-white flex flex-col items-center justify-center gap-1 transition">
+                        <i class="fa-solid fa-paintbrush"></i>
+                        <span>Pincel</span>
+                    </button>
+                    <button id="toolMagic" class="py-2 px-2 rounded-xl text-xs font-bold bg-amber-100 text-amber-900 hover:bg-amber-200 flex flex-col items-center justify-center gap-1 transition">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i>
+                        <span>Estrellitas</span>
+                    </button>
+                    <button id="toolEraser" class="py-2 px-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 flex flex-col items-center justify-center gap-1 transition">
+                        <i class="fa-solid fa-eraser"></i>
+                        <span>Borrador</span>
+                    </button>
+                </div>
+
+                <button id="btnFillBackground" class="w-full py-2 px-3 mb-3 rounded-xl font-bold text-xs flex items-center justify-center space-x-1.5 bg-sky-100 hover:bg-sky-200 text-sky-900 transition">
+                    <i class="fa-solid fa-fill"></i>
+                    <span>Pintar Fondo del Muro con este Color</span>
+                </button>
+
+                <div>
+                    <div class="flex justify-between text-xs font-bold text-slate-600 mb-1">
+                        <span>Tamaño del Pincel</span>
+                        <span id="brushSizeVal">28px</span>
+                    </div>
+                    <input type="range" id="brushSize" min="6" max="90" value="28" class="w-full accent-indigo-600 cursor-pointer">
+                </div>
+            </div>
+
+            <div class="bg-white rounded-3xl p-4 shadow-sm border border-pink-100 flex-1 flex flex-col">
+                <h2 class="font-bold text-lg text-indigo-950 flex items-center space-x-2 mb-1">
+                    <i class="fa-solid fa-shapes text-pink-500"></i>
+                    <span>Sellos para el Mural</span>
+                </h2>
+                <div class="grid grid-cols-3 gap-2 overflow-y-auto max-h-56 p-1.5 bg-purple-50/50 rounded-2xl border border-purple-100" id="stickersGrid"></div>
+
+                <div id="stickerControls" class="mt-3 pt-3 border-t border-slate-100 hidden space-y-2.5">
+                    <div class="flex justify-between items-center">
+                        <span class="text-xs font-bold text-indigo-900" id="selectedStickerTitle">Figura</span>
+                        <button id="btnDeleteSticker" class="text-rose-600 text-xs font-bold bg-rose-50 px-2.5 py-1 rounded-xl">Quitar</button>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <span class="text-[11px] font-semibold text-slate-500">Tamaño</span>
+                            <input type="range" id="stickerScale" min="0.3" max="3.0" step="0.05" value="1" class="w-full accent-pink-500">
+                        </div>
+                        <div>
+                            <span class="text-[11px] font-semibold text-slate-500">Giro</span>
+                            <input type="range" id="stickerRotate" min="-180" max="180" value="0" class="w-full accent-pink-500">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+    </main>
+<div id="pinModal" class="fixed inset-0 bg-slate-950/75 hidden items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl text-center">
+            <h3 class="font-playful text-xl font-bold text-indigo-950">Acceso Exclusivo Facilitador</h3>
+            <p class="text-xs text-slate-500 mt-1 mb-4">Ingresa tu PIN secreto (2026) para ver los bocetos y descargar el Excel.</p>
+            <form id="pinForm" class="space-y-3">
+                <input type="password" id="pinInput" inputmode="numeric" maxlength="8" placeholder="••••" required class="w-full text-center tracking-widest text-xl font-bold px-4 py-2.5 rounded-xl border-2 border-slate-200 focus:border-indigo-600 focus:outline-none">
+                <p id="pinError" class="text-xs font-bold text-rose-600 hidden">PIN incorrecto.</p>
+                <div class="grid grid-cols-2 gap-2 pt-1">
+                    <button type="button" id="closePinModal" class="py-2.5 rounded-xl font-bold text-xs bg-slate-100 text-slate-700">Cancelar</button>
+                    <button type="submit" class="py-2.5 rounded-xl font-bold text-xs bg-indigo-600 text-white">Entrar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="adminDashboardModal" class="fixed inset-0 bg-slate-950/80 hidden items-center justify-center z-50 p-3 sm:p-6">
+        <div class="bg-white rounded-3xl max-w-5xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+            <div class="bg-indigo-950 text-white px-5 py-4 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                    <h3 class="font-playful text-lg font-bold">Panel Privado Ludicalles</h3>
+                    <p class="text-xs text-indigo-200" id="adminStatusSubtitle">Cargando registros...</p>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <button id="btnRefreshAdmin" class="bg-indigo-800 hover:bg-indigo-700 text-white px-3 py-2 rounded-xl text-xs font-bold">Actualizar</button>
+                    <button id="btnDownloadXLSX" class="bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-4 py-2 rounded-xl text-xs font-extrabold">Descargar Excel (.xlsx)</button>
+                    <button id="closeAdminDashboard" class="bg-white/10 text-white w-9 h-9 rounded-xl">✕</button>
+                </div>
+            </div>
+            <div class="p-4 sm:p-6 overflow-y-auto flex-1 bg-slate-50">
+                <div id="adminRecordsGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const FACILITATOR_PIN = "2026";
+        const SUPABASE_URL = "https://mmqdkamrfzchgydthfjn.supabase.co"; 
+        const SUPABASE_ANON_KEY = "sb_publishable_fgMGlQHl8rRrttPP3JQ7KA_4ctWc31p";
+
+        const supabaseClient = (window.supabase && SUPABASE_URL.startsWith("http"))
+            ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+            : null;
+        const LOCAL_BACKUP_KEY = 'ludicalles_respaldo_privado_v2';
+
+        const PALETTE = [
+            { name: "Azul Cielo", hex: "#2563eb" },
+            { name: "Amarillo Sol", hex: "#facc15" },
+            { name: "Rojo Manzana", hex: "#ef4444" },
+            { name: "Verde Limón", hex: "#22c55e" },
+            { name: "Rosa Chicle", hex: "#ec4899" },
+            { name: "Naranja Mandarina", hex: "#f97316" },
+            { name: "Morado Mágico", hex: "#9333ea" },
+            { name: "Turquesa Mar", hex: "#06b6d4" },
+            { name: "Café Tierra", hex: "#92400e" },
+            { name: "Blanco Nube", hex: "#ffffff" },
+            { name: "Negro Contorno", hex: "#1e293b" }
+        ];
+
+        const MURAL_STAMPS = [
+            { id: 'sol_feliz', title: 'Sol Sonriente', svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="28" fill="#facc15" stroke="#f97316" stroke-width="5"/><circle cx="41" cy="45" r="3.5" fill="#1e293b"/><circle cx="59" cy="45" r="3.5" fill="#1e293b"/><path d="M40 56 Q50 66 60 56" stroke="#1e293b" stroke-width="3.5" fill="none" stroke-linecap="round"/></svg>` },
+            { id: 'arcoiris', title: 'Arcoíris', svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path d="M12 72 A38 38 0 0 1 88 72" fill="none" stroke="#ef4444" stroke-width="7" stroke-linecap="round"/><path d="M19 72 A31 31 0 0 1 81 72" fill="none" stroke="#facc15" stroke-width="7" stroke-linecap="round"/><path d="M26 72 A24 24 0 0 1 74 72" fill="none" stroke="#22c55e" stroke-width="7" stroke-linecap="round"/><path d="M33 72 A17 17 0 0 1 67 72" fill="none" stroke="#3b82f6" stroke-width="7" stroke-linecap="round"/></svg>` },
+            { id: 'cacomixtle_kid', title: 'Cacomixtle', svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path d="M22 76 C8 66 8 46 22 36" stroke="#f59e0b" stroke-width="9" stroke-linecap="round" fill="none"/><polygon points="32,32 38,14 48,28" fill="#92400e"/><polygon points="68,32 62,14 52,28" fill="#92400e"/><circle cx="50" cy="48" r="24" fill="#b45309"/><ellipse cx="41" cy="46" rx="7" ry="6" fill="#fef3c7"/><ellipse cx="59" cy="46" rx="7" ry="6" fill="#fef3c7"/><circle cx="41" cy="46" r="3" fill="#1e293b"/><circle cx="59" cy="46" r="3" fill="#1e293b"/><path d="M44 60 Q50 65 56 60" stroke="#1e293b" stroke-width="2.5" fill="none"/></svg>` },
+            { id: 'ajolote', title: 'Ajolote Rosa', svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><g stroke="#ec4899" stroke-width="5" stroke-linecap="round"><line x1="25" y1="35" x2="12" y2="25"/><line x1="22" y1="48" x2="8" y2="48"/><line x1="75" y1="35" x2="88" y2="25"/><line x1="78" y1="48" x2="92" y2="48"/></g><rect x="24" y="26" width="52" height="46" rx="23" fill="#fbcfe8" stroke="#f472b6" stroke-width="3"/><circle cx="38" cy="46" r="4" fill="#1e293b"/><circle cx="62" cy="46" r="4" fill="#1e293b"/><path d="M42 56 Q50 64 58 56" stroke="#db2777" stroke-width="3.5" fill="none"/></svg>` },
+            { id: 'cohete', title: 'Cohete Espacial', svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><polygon points="50,10 68,40 32,40" fill="#ef4444"/><rect x="34" y="38" width="32" height="36" rx="6" fill="#f8fafc" stroke="#cbd5e1" stroke-width="2"/><circle cx="50" cy="52" r="9" fill="#38bdf8"/><polygon points="40,74 50,92 60,74" fill="#f97316"/></svg>` },
+            { id: 'flor_alegre', title: 'Flor de Colores', svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><line x1="50" y1="55" x2="50" y2="92" stroke="#16a34a" stroke-width="6"/><circle cx="50" cy="24" r="13" fill="#ec4899"/><circle cx="70" cy="38" r="13" fill="#a855f7"/><circle cx="62" cy="60" r="13" fill="#3b82f6"/><circle cx="38" cy="60" r="13" fill="#f97316"/><circle cx="30" cy="38" r="13" fill="#ef4444"/><circle cx="50" cy="43" r="14" fill="#facc15"/></svg>` },
+            { id: 'mariposa', title: 'Mariposa', svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><ellipse cx="32" cy="38" rx="18" ry="14" fill="#a855f7"/><ellipse cx="68" cy="38" rx="18" ry="14" fill="#a855f7"/><ellipse cx="34" cy="62" rx="14" ry="11" fill="#ec4899"/><ellipse cx="66" cy="62" rx="14" ry="11" fill="#ec4899"/><rect x="46" y="26" width="8" height="48" rx="4" fill="#1e293b"/></svg>` },
+            { id: 'estrella_fugaz', title: 'Estrella Feliz', svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><polygon points="50,10 61,36 90,38 68,57 75,85 50,70 25,85 32,57 10,38 39,36" fill="#facc15" stroke="#eab308" stroke-width="3"/></svg>` },
+            { id: 'arbol_vida', title: 'Árbol Frondoso', svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect x="42" y="56" width="16" height="34" rx="4" fill="#92400e"/><circle cx="50" cy="36" r="24" fill="#22c55e"/><circle cx="32" cy="46" r="18" fill="#16a34a"/><circle cx="68" cy="46" r="18" fill="#16a34a"/></svg>` }
+        ];
+
+        const state = {
+            activeMode: 'poly',
+            polyTarget: 'wall',
+            drawTool: 'brush',
+            currentColor: PALETTE[0].hex,
+            brushSize: 28,
+            bgSource: null,
+            polygon: { wall: { points: [], isClosed: false }, holes: [], currentHole: [], showGuide: true, draggingTarget: null },
+            stickers: [],
+            selectedStickerIndex: -1,
+            isDraggingSticker: false,
+            dragOffset: { x: 0, y: 0 },
+            history: [],
+            adminRecords: []
+        };
+
+        const canvas = document.getElementById('mainCanvas');
+        const ctx = canvas.getContext('2d');
+        let paintCanvas = document.createElement('canvas');
+        let paintCtx = paintCanvas.getContext('2d');
+
+        document.addEventListener('DOMContentLoaded', () => {
+            setupUI();
+            setupAdminSecurity();
+            loadDefaultImage();
+        });
+
+        function showRegFeedback(msg, type = 'success') {
+            const box = document.getElementById('regFeedback');
+            box.textContent = msg;
+            box.className = type === 'error'
+                ? "mt-2.5 text-xs font-semibold text-rose-700 bg-rose-50 border border-rose-200 px-3 py-2 rounded-xl"
+                : type === 'loading'
+                ? "mt-2.5 text-xs font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 px-3 py-2 rounded-xl"
+                : "mt-2.5 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-2 rounded-xl";
+            box.classList.remove('hidden');
+            if (type !== 'loading') setTimeout(() => box.classList.add('hidden'), 5000);
+        }
+
+        function getCleanSketchDataURL() {
+            render(true);
+            const maxW = 900;
+            const scale = canvas.width > maxW ? (maxW / canvas.width) : 1;
+            const temp = document.createElement('canvas');
+            temp.width = Math.round(canvas.width * scale);
+            temp.height = Math.round(canvas.height * scale);
+            temp.getContext('2d').drawImage(canvas, 0, 0, temp.width, temp.height);
+            render(false);
+            return temp.toDataURL('image/jpeg', 0.82);
+        }
+
+        function dataURLtoBlob(dataurl) {
+            const arr = dataurl.split(',');
+            const mime = arr[0].match(/:(.*?);/)[1];
+            const bstr = atob(arr[1]);
+            let n = bstr.length;
+            const u8arr = new Uint8Array(n);
+            while (n--) u8arr[n] = bstr.charCodeAt(n);
+            return new Blob([u8arr], { type: mime });
+        }
+
+        async function handleParticipantSubmit(e) {
+            e.preventDefault();
+            const nombre = document.getElementById('artistName').value.trim();
+            const edad = document.getElementById('artistAge').value.trim();
+            const titulo_mural = document.getElementById('muralTitle').value.trim();
+            if (!nombre) return showRegFeedback("Por favor escribe tu nombre.", "error");
+
+            const btn = document.getElementById('btnSubmitMural');
+            btn.disabled = true;
+            showRegFeedback("Guardando tu mural y enviando datos...", "loading");
+
+            const sellos_usados = state.stickers.length > 0 ? state.stickers.map(s => s.title).join(', ') : 'Dibujo libre';
+            const sketchDataUrl = getCleanSketchDataURL();
+            const fechaLegible = new Date().toLocaleDateString('es-MX') + ' ' + new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+
+            let savedInCloud = false;
+            let publicImageUrl = sketchDataUrl;
+
+            if (supabaseClient) {
+                try {
+                    const slug = nombre.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, '-');
+                    const fileName = `${Date.now()}-${slug || 'mural'}.jpg`;
+                    const blob = dataURLtoBlob(sketchDataUrl);
+
+                    const { error: uploadErr } = await supabaseClient.storage.from('bocetos').upload(fileName, blob, { contentType: 'image/jpeg' });
+                    if (uploadErr) throw uploadErr;
+
+                    const { data: urlData } = supabaseClient.storage.from('bocetos').getPublicUrl(fileName);
+                    publicImageUrl = urlData.publicUrl;
+
+                    const { error: insertErr } = await supabaseClient.from('murales_ludicalles').insert([{
+                        nombre, edad: edad || null, titulo_mural: titulo_mural || null, sellos_usados, boceto_url: publicImageUrl
+                    }]);
+                    if (insertErr) throw insertErr;
+                    savedInCloud = true;
+                } catch (err) {
+                    console.warn("Error nube, guardando local:", err);
+                }
+            }
+
+            try {
+                const existing = JSON.parse(localStorage.getItem(LOCAL_BACKUP_KEY) || '[]');
+                existing.push({ fecha: fechaLegible, nombre, edad: edad || '', titulo_mural: titulo_mural || '', sellos_usados, boceto_url: publicImageUrl });
+                localStorage.setItem(LOCAL_BACKUP_KEY, JSON.stringify(existing));
+            } catch (e) {}
+
+            btn.disabled = false;
+            showRegFeedback(savedInCloud ? `¡Gracias ${nombre}! Boceto enviado a Ludicalles.` : `¡Listo ${nombre}! Boceto guardado en el dispositivo.`);
+            document.getElementById('artistForm').reset();
+            render();
+        }
+
+        function setupAdminSecurity() {
+            const pinModal = document.getElementById('pinModal');
+            const pinInput = document.getElementById('pinInput');
+            const pinError = document.getElementById('pinError');
+            const dashboard = document.getElementById('adminDashboardModal');
+
+            document.getElementById('btnAdminAccess').addEventListener('click', () => {
+                pinInput.value = '';
+                pinError.classList.add('hidden');
+                pinModal.classList.remove('hidden');
+                pinModal.classList.add('flex');
+                setTimeout(() => pinInput.focus(), 100);
+            });
+
+            document.getElementById('closePinModal').addEventListener('click', () => {
+                pinModal.classList.add('hidden');
+                pinModal.classList.remove('flex');
+            });
+
+            document.getElementById('pinForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                if (pinInput.value === FACILITATOR_PIN) {
+                    pinModal.classList.add('hidden');
+                    pinModal.classList.remove('flex');
+                    dashboard.classList.remove('hidden');
+                    dashboard.classList.add('flex');
+                    await loadAdminRecords();
+                } else {
+                    pinError.classList.remove('hidden');
+                    pinInput.value = '';
+                }
+            });
+
+            document.getElementById('closeAdminDashboard').addEventListener('click', () => {
+                dashboard.classList.add('hidden');
+                dashboard.classList.remove('flex');
+            });
+
+            document.getElementById('btnRefreshAdmin').addEventListener('click', loadAdminRecords);
+            document.getElementById('btnDownloadXLSX').addEventListener('click', downloadRealExcel);
+        }
+
+        async function loadAdminRecords() {
+            const subtitle = document.getElementById('adminStatusSubtitle');
+            const grid = document.getElementById('adminRecordsGrid');
+            subtitle.textContent = "Consultando registros...";
+            let records = [];
+
+            if (supabaseClient) {
+                try {
+                    const { data, error } = await supabaseClient.from('murales_ludicalles').select('*').order('created_at', { ascending: false });
+                    if (error) throw error;
+                    records = (data || []).map(r => ({
+                        fecha: new Date(r.created_at).toLocaleDateString('es-MX') + ' ' + new Date(r.created_at).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' }),
+                        nombre: r.nombre, edad: r.edad || '', titulo_mural: r.titulo_mural || '', sellos_usados: r.sellos_usados || 'Dibujo libre', boceto_url: r.boceto_url
+                    }));
+                    subtitle.textContent = `Conectado a Supabase · ${records.length} murales recibidos`;
+                } catch (err) {
+                    subtitle.textContent = "Mostrando respaldo local";
+                }
+            }
+
+            if (records.length === 0) {
+                records = JSON.parse(localStorage.getItem(LOCAL_BACKUP_KEY) || '[]').slice().reverse();
+            }
+
+            state.adminRecords = records;
+            grid.innerHTML = records.length === 0 ? `<div class="col-span-full text-center py-12 text-slate-400 text-sm">Aún no hay bocetos registrados.</div>` : '';
+            records.forEach((rec, idx) => {
+                const card = document.createElement('div');
+                card.className = "bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs flex flex-col";
+                card.innerHTML = `
+                    <div class="bg-slate-900 aspect-video relative"><img src="${rec.boceto_url}" class="w-full h-full object-contain"></div>
+                    <div class="p-3.5 text-xs space-y-1.5">
+                        <div class="flex justify-between font-bold text-indigo-950"><span>${rec.nombre}</span><span>${rec.edad ? rec.edad + ' años' : ''}</span></div>
+                        <p class="text-slate-600">${rec.titulo_mural || 'Sin título'}</p>
+                        <p class="text-slate-400 text-[11px]">${rec.fecha}</p>
+                        <a href="${rec.boceto_url}" download="boceto-${rec.nombre}.jpg" target="_blank" class="block w-full py-1.5 rounded-xl bg-indigo-50 text-indigo-700 font-bold text-center">Ver / Descargar Boceto</a>
+                    </div>`;
+                grid.appendChild(card);
+            });
+        }
+
+        function downloadRealExcel() {
+            if (!state.adminRecords.length) return alert("No hay registros para exportar.");
+            const rows = state.adminRecords.map((rec, i) => ({
+                "No.": i + 1,
+                "Fecha y Hora": rec.fecha,
+                "Nombre del Niño / Niña": rec.nombre,
+                "Edad": rec.edad || "No especificada",
+                "Nombre del Mural": rec.titulo_mural || "Sin título",
+                "Sellos Usados": rec.sellos_usados,
+                "Enlace al Boceto": rec.boceto_url.startsWith('http') ? rec.boceto_url : "Local"
+            }));
+            const ws = XLSX.utils.json_to_sheet(rows);
+            ws['!cols'] = [{ wch: 6 }, { wch: 20 }, { wch: 28 }, { wch: 15 }, { wch: 28 }, { wch: 25 }, { wch: 55 }];
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Murales Ludicalles");
+            XLSX.writeFile(wb, `Reporte-Ludicalles-${new Date().toISOString().slice(0, 10)}.xlsx`);
+        }
+
+        function setDrawTool(tool) {
+            state.drawTool = tool;
+            if (state.activeMode !== 'draw') setMode('draw');
+        }
+
+        function setPolyTarget(target) {
+            state.polyTarget = target;
+            if (target === 'hole') state.polygon.currentHole = [];
+            document.getElementById('targetWall').className = target === 'wall' ? "px-2.5 py-1 rounded-xl font-bold flex items-center space-x-1.5 bg-indigo-600 text-white" : "px-2.5 py-1 rounded-xl font-bold flex items-center space-x-1.5 bg-white text-indigo-700 border border-indigo-300";
+            document.getElementById('targetHole').className = target === 'hole' ? "px-2.5 py-1 rounded-xl font-bold flex items-center space-x-1.5 bg-rose-600 text-white" : "px-2.5 py-1 rounded-xl font-bold flex items-center space-x-1.5 bg-white text-rose-700 border border-rose-300";
+            updatePolygonUI();
+            if (state.activeMode !== 'poly') setMode('poly');
+            else render();
+        }
+
+        function setMode(mode) {
+            state.activeMode = mode;
+            ['poly', 'draw', 'sticker'].forEach(m => {
+                const btn = document.getElementById('mode' + m.charAt(0).toUpperCase() + m.slice(1));
+                btn.classList.toggle('bg-indigo-600', m === mode);
+                btn.classList.toggle('text-white', m === mode);
+                btn.classList.toggle('text-slate-600', m !== mode);
+            });
+            render();
+        }
+
+        function updatePolygonUI() {
+            const btnClose = document.getElementById('btnCloseActivePoly');
+            const hint = document.getElementById('polyHint');
+            btnClose.classList.add('hidden');
+            if (state.polyTarget === 'wall') {
+                if (state.polygon.wall.isClosed) hint.textContent = "¡Muro listo! Pasa a '2. Dibujar Mural' o protege ventanas.";
+                else if (state.polygon.wall.points.length >= 3) {
+                    btnClose.classList.remove('hidden');
+                    hint.textContent = "Pulsa 'Cerrar Muro' o toca el primer punto amarillo.";
+                } else hint.textContent = `Toca las esquinas de la pared (${state.polygon.wall.points.length} puntos).`;
+            } else {
+                if (state.polygon.currentHole.length >= 3) {
+                    btnClose.classList.remove('hidden');
+                    hint.textContent = "Pulsa 'Cerrar Muro' para excluir esta ventana/puerta.";
+                } else hint.textContent = `Marca las esquinas de la ventana/puerta (${state.polygon.currentHole.length} puntos).`;
+            }
+        }
+
+        function closeActivePolygon() {
+            if (state.polyTarget === 'wall' && state.polygon.wall.points.length >= 3) {
+                state.polygon.wall.isClosed = true;
+                updatePolygonUI();
+                setMode('draw');
+                return;
+            } else if (state.polyTarget === 'hole' && state.polygon.currentHole.length >= 3) {
+                state.polygon.holes.push([...state.polygon.currentHole]);
+                state.polygon.currentHole = [];
+            }
+            updatePolygonUI();
+            render();
+        }
+
+        function applyWallClip(targetCtx) {
+            if (!state.polygon.wall.isClosed || state.polygon.wall.points.length < 3) return false;
+            targetCtx.beginPath();
+            const pts = state.polygon.wall.points;
+            targetCtx.moveTo(pts[0].x, pts[0].y);
+            for (let i = 1; i < pts.length; i++) targetCtx.lineTo(pts[i].x, pts[i].y);
+            targetCtx.closePath();
+            state.polygon.holes.forEach(hole => {
+                if (hole.length >= 3) {
+                    targetCtx.moveTo(hole[0].x, hole[0].y);
+                    for (let j = 1; j < hole.length; j++) targetCtx.lineTo(hole[j].x, hole[j].y);
+                    targetCtx.closePath();
+                }
+            });
+            targetCtx.clip('evenodd');
+            return true;
+        }
+
+        function fillWallBackground() {
+            saveHistory();
+            paintCtx.save();
+            applyWallClip(paintCtx);
+            paintCtx.globalCompositeOperation = 'source-over';
+            paintCtx.fillStyle = state.currentColor;
+            paintCtx.fillRect(0, 0, paintCanvas.width, paintCanvas.height);
+            paintCtx.restore();
+            setMode('draw');
+            render();
+        }
+
+        function drawMagicSparkle(x, y, size) {
+            const colors = [state.currentColor, '#facc15', '#ec4899', '#38bdf8', '#ffffff'];
+            paintCtx.save();
+            paintCtx.translate(x + (Math.random() * size - size / 2), y + (Math.random() * size - size / 2));
+            paintCtx.fillStyle = colors[Math.floor(Math.random() * colors.length)];
+            paintCtx.beginPath();
+            paintCtx.arc(0, 0, size * 0.25, 0, Math.PI * 2);
+            paintCtx.fill();
+            paintCtx.restore();
+        }
+
+        function setupUI() {
+            document.getElementById('artistForm').addEventListener('submit', handleParticipantSubmit);
+            document.getElementById('artistName').addEventListener('input', () => render());
+            document.getElementById('muralTitle').addEventListener('input', () => render());
+
+            const paletteEl = document.getElementById('colorPalette');
+            PALETTE.forEach((color, index) => {
+                const btn = document.createElement('button');
+                btn.className = `w-full aspect-square rounded-full border-2 ${index === 0 ? 'border-indigo-950 scale-110' : 'border-slate-200'}`;
+                btn.style.backgroundColor = color.hex;
+                btn.addEventListener('click', () => {
+                    state.currentColor = color.hex;
+                    document.getElementById('selectedColorName').textContent = color.name;
+                    if (state.drawTool === 'eraser') setDrawTool('brush');
+                });
+                paletteEl.appendChild(btn);
+            });
+
+            document.getElementById('customColorPicker').addEventListener('input', (e) => {
+                state.currentColor = e.target.value;
+                if (state.drawTool === 'eraser') setDrawTool('brush');
+            });
+
+            document.getElementById('toolBrush').addEventListener('click', () => setDrawTool('brush'));
+            document.getElementById('toolMagic').addEventListener('click', () => setDrawTool('magic'));
+            document.getElementById('toolEraser').addEventListener('click', () => setDrawTool('eraser'));
+            document.getElementById('btnFillBackground').addEventListener('click', fillWallBackground);
+
+            document.getElementById('targetWall').addEventListener('click', () => setPolyTarget('wall'));
+            document.getElementById('targetHole').addEventListener('click', () => setPolyTarget('hole'));
+            document.getElementById('btnCloseActivePoly').addEventListener('click', closeActivePolygon);
+            document.getElementById('btnResetPoly').addEventListener('click', () => {
+                state.polygon.wall = { points: [], isClosed: false };
+                state.polygon.holes = [];
+                state.polygon.currentHole = [];
+                setPolyTarget('wall');
+                render();
+            });
+
+            document.getElementById('showPolyGuide').addEventListener('change', (e) => {
+                state.polygon.showGuide = e.target.checked;
+                render();
+            });
+
+            const stickersGrid = document.getElementById('stickersGrid');
+            MURAL_STAMPS.forEach(stamp => {
+                const card = document.createElement('div');
+                card.className = "bg-white p-2 rounded-2xl border border-purple-100 cursor-pointer text-center flex flex-col items-center";
+                card.innerHTML = `<div class="w-12 h-12 mb-1 pointer-events-none">${stamp.svg}</div><span class="text-[10px] font-bold">${stamp.title}</span>`;
+                card.addEventListener('click', () => addSticker(stamp));
+                stickersGrid.appendChild(card);
+            });
+
+            document.getElementById('modePoly').addEventListener('click', () => setMode('poly'));
+            document.getElementById('modeDraw').addEventListener('click', () => setMode('draw'));
+            document.getElementById('modeSticker').addEventListener('click', () => setMode('sticker'));
+
+            document.getElementById('brushSize').addEventListener('input', (e) => {
+                state.brushSize = parseInt(e.target.value);
+                document.getElementById('brushSizeVal').textContent = `${state.brushSize}px`;
+            });
+
+            document.getElementById('stickerScale').addEventListener('input', (e) => {
+                if (state.selectedStickerIndex >= 0) { state.stickers[state.selectedStickerIndex].scale = parseFloat(e.target.value); render(); }
+            });
+            document.getElementById('stickerRotate').addEventListener('input', (e) => {
+                if (state.selectedStickerIndex >= 0) { state.stickers[state.selectedStickerIndex].rotation = parseInt(e.target.value); render(); }
+            });
+            document.getElementById('btnDeleteSticker').addEventListener('click', () => {
+                if (state.selectedStickerIndex >= 0) { state.stickers.splice(state.selectedStickerIndex, 1); state.selectedStickerIndex = -1; updateStickerControls(); render(); }
+            });
+
+            document.getElementById('quickScaleUp').addEventListener('click', () => { if (state.selectedStickerIndex >= 0) { state.stickers[state.selectedStickerIndex].scale += 0.15; render(); } });
+            document.getElementById('quickScaleDown').addEventListener('click', () => { if (state.selectedStickerIndex >= 0) { state.stickers[state.selectedStickerIndex].scale = Math.max(0.3, state.stickers[state.selectedStickerIndex].scale - 0.15); render(); } });
+            document.getElementById('quickRotateLeft').addEventListener('click', () => { if (state.selectedStickerIndex >= 0) { state.stickers[state.selectedStickerIndex].rotation -= 15; render(); } });
+            document.getElementById('quickRotateRight').addEventListener('click', () => { if (state.selectedStickerIndex >= 0) { state.stickers[state.selectedStickerIndex].rotation += 15; render(); } });
+            document.getElementById('quickDuplicate').addEventListener('click', () => {
+                if (state.selectedStickerIndex >= 0) {
+                    const o = state.stickers[state.selectedStickerIndex];
+                    state.stickers.push({ ...o, x: o.x + 30, y: o.y + 30 });
+                    state.selectedStickerIndex = state.stickers.length - 1;
+                    render();
+                }
+            });
+            document.getElementById('quickDelete').addEventListener('click', () => {
+                if (state.selectedStickerIndex >= 0) { state.stickers.splice(state.selectedStickerIndex, 1); state.selectedStickerIndex = -1; updateStickerControls(); render(); }
+            });
+
+            document.getElementById('btnClear').addEventListener('click', () => {
+                paintCtx.clearRect(0, 0, paintCanvas.width, paintCanvas.height);
+                state.stickers = [];
+                state.selectedStickerIndex = -1;
+                updateStickerControls();
+                render();
+            });
+
+            document.getElementById('btnUndo').addEventListener('click', () => {
+                if (state.history.length > 0) {
+                    const img = new Image();
+                    img.onload = () => { paintCtx.clearRect(0, 0, paintCanvas.width, paintCanvas.height); paintCtx.drawImage(img, 0, 0); render(); };
+                    img.src = state.history.pop();
+                }
+            });
+
+            const imageInput = document.getElementById('imageUpload');
+            imageInput.addEventListener('change', (e) => {
+                const file = e.target.files && e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        setNewImage(img, img.naturalWidth || img.width, img.naturalHeight || img.height);
+                        imageInput.value = '';
+                    };
+                    img.src = event.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+
+            document.getElementById('btnExport').addEventListener('click', () => {
+                render(true);
+                const link = document.createElement('a');
+                link.download = `mural-ludicalles-${Date.now()}.png`;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+                render(false);
+            });
+
+            setupCanvasInteraction();
+        }
+
+        function loadDefaultImage() {
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = 1000; tempCanvas.height = 650;
+            const tctx = tempCanvas.getContext('2d');
+            tctx.fillStyle = '#e0f2fe'; tctx.fillRect(0, 0, 1000, 650);
+            tctx.fillStyle = '#f8fafc'; tctx.fillRect(90, 140, 820, 410);
+            tctx.strokeStyle = '#cbd5e1'; tctx.lineWidth = 4; tctx.strokeRect(90, 140, 820, 410);
+            tctx.fillStyle = '#334155'; tctx.fillRect(740, 340, 110, 210);
+            tctx.fillStyle = '#1e293b'; tctx.fillRect(160, 210, 140, 110);
+            tctx.fillStyle = '#94a3b8'; tctx.fillRect(0, 550, 1000, 100);
+            setNewImage(tempCanvas, 1000, 650);
+        }
+
+        function setNewImage(source, w, h) {
+            state.bgSource = source;
+            canvas.width = w; canvas.height = h;
+            paintCanvas.width = w; paintCanvas.height = h;
+            paintCtx.clearRect(0, 0, w, h);
+            state.stickers = [];
+            state.selectedStickerIndex = -1;
+            state.polygon.wall = { points: [], isClosed: false };
+            state.polygon.holes = [];
+            state.polygon.currentHole = [];
+            state.history = [];
+            updateStickerControls();
+            setPolyTarget('wall');
+            render();
+        }
+
+        function saveHistory() {
+            if (state.history.length > 10) state.history.shift();
+            state.history.push(paintCanvas.toDataURL());
+        }
+
+        function addSticker(stampData) {
+            const svgImg = new Image();
+            svgImg.onload = () => {
+                state.stickers.push({ img: svgImg, title: stampData.title, x: canvas.width / 2, y: canvas.height / 2, width: 140, height: 140, scale: 1.0, rotation: 0 });
+                state.selectedStickerIndex = state.stickers.length - 1;
+                setMode('sticker');
+                updateStickerControls();
+                render();
+            };
+            svgImg.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(stampData.svg);
+        }
+
+        function updateStickerControls() {
+            const show = state.selectedStickerIndex >= 0;
+            document.getElementById('stickerControls').classList.toggle('hidden', !show);
+            document.getElementById('floatingStickerControls').classList.toggle('hidden', !show);
+        }
+
+        function drawPolygonHelper(pts, isClosed, colorHex, fillRgba, scaleFactor, allowCloseHighlight) {
+            if (!pts.length) return;
+            ctx.beginPath();
+            ctx.moveTo(pts[0].x, pts[0].y);
+            for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+            if (isClosed) { ctx.closePath(); ctx.fillStyle = fillRgba; ctx.fill(); }
+            ctx.strokeStyle = colorHex; ctx.lineWidth = 4 * scaleFactor; ctx.stroke();
+            pts.forEach((pt, idx) => {
+                ctx.beginPath();
+                ctx.arc(pt.x, pt.y, 9 * scaleFactor, 0, Math.PI * 2);
+                ctx.fillStyle = (idx === 0 && !isClosed && allowCloseHighlight && pts.length >= 3) ? '#facc15' : colorHex;
+                ctx.fill();
+            });
+        }
+
+        function render(hideGuides = false) {
+            if (!state.bgSource) return;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(state.bgSource, 0, 0, canvas.width, canvas.height);
+
+            ctx.save();
+            applyWallClip(ctx);
+            ctx.globalAlpha = 0.88;
+            ctx.drawImage(paintCanvas, 0, 0);
+            ctx.restore();
+
+            state.stickers.forEach((stk, index) => {
+                ctx.save();
+                ctx.translate(stk.x, stk.y);
+                ctx.rotate((stk.rotation * Math.PI) / 180);
+                const w = stk.width * stk.scale, h = stk.height * stk.scale;
+                ctx.drawImage(stk.img, -w / 2, -h / 2, w, h);
+                if (!hideGuides && index === state.selectedStickerIndex) {
+                    ctx.strokeStyle = '#ec4899'; ctx.lineWidth = 4; ctx.strokeRect(-w / 2 - 6, -h / 2 - 6, w + 12, h + 12);
+                }
+                ctx.restore();
+            });
+
+            if (!hideGuides && state.polygon.showGuide) {
+                const sf = Math.max(1, canvas.width / 800);
+                drawPolygonHelper(state.polygon.wall.points, state.polygon.wall.isClosed, '#4f46e5', 'rgba(79, 70, 229, 0.08)', sf, state.polyTarget === 'wall');
+                state.polygon.holes.forEach(h => drawPolygonHelper(h, true, '#e11d48', 'rgba(225, 29, 72, 0.15)', sf, false));
+                if (state.polyTarget === 'hole') drawPolygonHelper(state.polygon.currentHole, false, '#e11d48', 'rgba(225, 29, 72, 0.15)', sf, true);
+            }
+        }
+
+        function getCanvasCoords(e) {
+            const rect = canvas.getBoundingClientRect();
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            return { x: (clientX - rect.left) * (canvas.width / rect.width), y: (clientY - rect.top) * (canvas.height / rect.height) };
+        }
+
+        let isDrawing = false;
+        function setupCanvasInteraction() {
+            canvas.addEventListener('mousedown', (e) => {
+                const pos = getCanvasCoords(e);
+                if (state.activeMode === 'poly') {
+                    if (state.polyTarget === 'wall' && !state.polygon.wall.isClosed) {
+                        if (state.polygon.wall.points.length >= 3 && Math.hypot(pos.x - state.polygon.wall.points[0].x, pos.y - state.polygon.wall.points[0].y) < 30) {
+                            closeActivePolygon(); return;
+                        }
+                        state.polygon.wall.points.push(pos); updatePolygonUI(); render();
+                    } else if (state.polyTarget === 'hole') {
+                        if (state.polygon.currentHole.length >= 3 && Math.hypot(pos.x - state.polygon.currentHole[0].x, pos.y - state.polygon.currentHole[0].y) < 30) {
+                            closeActivePolygon(); return;
+                        }
+                        state.polygon.currentHole.push(pos); updatePolygonUI(); render();
+                    }
+                    return;
+                }
+
+                for (let i = state.stickers.length - 1; i >= 0; i--) {
+                    const s = state.stickers[i];
+                    if (Math.abs(pos.x - s.x) < (s.width * s.scale) / 2 && Math.abs(pos.y - s.y) < (s.height * s.scale) / 2) {
+                        state.selectedStickerIndex = i; state.isDraggingSticker = true; state.dragOffset = { x: pos.x - s.x, y: pos.y - s.y };
+                        setMode('sticker'); updateStickerControls(); render(); return;
+                    }
+                }
+
+                if (state.activeMode === 'draw') {
+                    isDrawing = true; saveHistory(); paintCtx.save(); applyWallClip(paintCtx);
+                    if (state.drawTool === 'magic') drawMagicSparkle(pos.x, pos.y, state.brushSize);
+                    else {
+                        paintCtx.globalCompositeOperation = state.drawTool === 'eraser' ? 'destination-out' : 'source-over';
+                        paintCtx.strokeStyle = state.currentColor; paintCtx.lineWidth = state.brushSize; paintCtx.lineCap = 'round';
+                        paintCtx.beginPath(); paintCtx.moveTo(pos.x, pos.y); paintCtx.lineTo(pos.x, pos.y); paintCtx.stroke();
+                    }
+                    render();
+                }
+            });
+
+            canvas.addEventListener('mousemove', (e) => {
+                const pos = getCanvasCoords(e);
+                if (state.isDraggingSticker && state.selectedStickerIndex >= 0) {
+                    state.stickers[state.selectedStickerIndex].x = pos.x - state.dragOffset.x;
+                    state.stickers[state.selectedStickerIndex].y = pos.y - state.dragOffset.y;
+                    render();
+                } else if (isDrawing && state.activeMode === 'draw') {
+                    if (state.drawTool === 'magic') drawMagicSparkle(pos.x, pos.y, state.brushSize);
+                    else { paintCtx.lineTo(pos.x, pos.y); paintCtx.stroke(); }
+                    render();
+                }
+            });
+
+            window.addEventListener('mouseup', () => {
+                if (isDrawing) paintCtx.restore();
+                isDrawing = false; state.isDraggingSticker = false;
+            });
+        }
+    </script>
+</body>
+</html>
