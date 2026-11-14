@@ -13,6 +13,7 @@
         body { font-family: 'Plus Jakarta Sans', sans-serif; }
         h1, h2, .font-playful { font-family: 'Fredoka', sans-serif; }
         .canvas-container { touch-action: none; user-select: none; }
+        #mainCanvas { touch-action: none; }
     </style>
 </head>
 <body class="bg-sky-50 text-slate-800 min-h-screen flex flex-col">
@@ -241,7 +242,8 @@
             </div>
         </aside>
     </main>
-<div id="pinModal" class="fixed inset-0 bg-slate-950/75 hidden items-center justify-center z-50 p-4">
+
+    <div id="pinModal" class="fixed inset-0 bg-slate-950/75 hidden items-center justify-center z-50 p-4">
         <div class="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl text-center">
             <h3 class="font-playful text-xl font-bold text-indigo-950">Acceso Exclusivo Facilitador</h3>
             <p class="text-xs text-slate-500 mt-1 mb-4">Ingresa tu PIN secreto (2026) para ver los bocetos y descargar el Excel.</p>
@@ -632,19 +634,31 @@
             const paletteEl = document.getElementById('colorPalette');
             PALETTE.forEach((color, index) => {
                 const btn = document.createElement('button');
-                btn.className = `w-full aspect-square rounded-full border-2 ${index === 0 ? 'border-indigo-950 scale-110' : 'border-slate-200'}`;
+                btn.type = 'button';
+                btn.className = `palette-swatch w-full aspect-square rounded-full border-2 transition-transform ${index === 0 ? 'border-indigo-950 scale-110 ring-2 ring-indigo-400' : 'border-slate-200'}`;
                 btn.style.backgroundColor = color.hex;
                 btn.addEventListener('click', () => {
                     state.currentColor = color.hex;
                     document.getElementById('selectedColorName').textContent = color.name;
+
+                    document.querySelectorAll('.palette-swatch').forEach(el => {
+                        el.classList.remove('border-indigo-950', 'scale-110', 'ring-2', 'ring-indigo-400');
+                        el.classList.add('border-slate-200');
+                    });
+                    btn.classList.remove('border-slate-200');
+                    btn.classList.add('border-indigo-950', 'scale-110', 'ring-2', 'ring-indigo-400');
+
                     if (state.drawTool === 'eraser') setDrawTool('brush');
+                    if (state.polygon.wall.isClosed && state.activeMode !== 'draw') setMode('draw');
                 });
                 paletteEl.appendChild(btn);
             });
 
             document.getElementById('customColorPicker').addEventListener('input', (e) => {
                 state.currentColor = e.target.value;
+                document.getElementById('selectedColorName').textContent = "Color personalizado";
                 if (state.drawTool === 'eraser') setDrawTool('brush');
+                if (state.polygon.wall.isClosed && state.activeMode !== 'draw') setMode('draw');
             });
 
             document.getElementById('toolBrush').addEventListener('click', () => setDrawTool('brush'));
@@ -856,23 +870,30 @@
 
         function getCanvasCoords(e) {
             const rect = canvas.getBoundingClientRect();
-            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-            return { x: (clientX - rect.left) * (canvas.width / rect.width), y: (clientY - rect.top) * (canvas.height / rect.height) };
+            const clientX = e.touches && e.touches.length > 0 ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches && e.touches.length > 0 ? e.touches[0].clientY : e.clientY;
+            return { 
+                x: (clientX - rect.left) * (canvas.width / rect.width), 
+                y: (clientY - rect.top) * (canvas.height / rect.height) 
+            };
         }
 
         let isDrawing = false;
         function setupCanvasInteraction() {
-            canvas.addEventListener('mousedown', (e) => {
+            canvas.addEventListener('pointerdown', (e) => {
+                if (e.button !== undefined && e.button !== 0 && e.pointerType === 'mouse') return;
+                canvas.setPointerCapture(e.pointerId);
                 const pos = getCanvasCoords(e);
+
                 if (state.activeMode === 'poly') {
+                    const hitRadius = Math.max(30, canvas.width / 25);
                     if (state.polyTarget === 'wall' && !state.polygon.wall.isClosed) {
-                        if (state.polygon.wall.points.length >= 3 && Math.hypot(pos.x - state.polygon.wall.points[0].x, pos.y - state.polygon.wall.points[0].y) < 30) {
+                        if (state.polygon.wall.points.length >= 3 && Math.hypot(pos.x - state.polygon.wall.points[0].x, pos.y - state.polygon.wall.points[0].y) < hitRadius) {
                             closeActivePolygon(); return;
                         }
                         state.polygon.wall.points.push(pos); updatePolygonUI(); render();
                     } else if (state.polyTarget === 'hole') {
-                        if (state.polygon.currentHole.length >= 3 && Math.hypot(pos.x - state.polygon.currentHole[0].x, pos.y - state.polygon.currentHole[0].y) < 30) {
+                        if (state.polygon.currentHole.length >= 3 && Math.hypot(pos.x - state.polygon.currentHole[0].x, pos.y - state.polygon.currentHole[0].y) < hitRadius) {
                             closeActivePolygon(); return;
                         }
                         state.polygon.currentHole.push(pos); updatePolygonUI(); render();
@@ -883,40 +904,74 @@
                 for (let i = state.stickers.length - 1; i >= 0; i--) {
                     const s = state.stickers[i];
                     if (Math.abs(pos.x - s.x) < (s.width * s.scale) / 2 && Math.abs(pos.y - s.y) < (s.height * s.scale) / 2) {
-                        state.selectedStickerIndex = i; state.isDraggingSticker = true; state.dragOffset = { x: pos.x - s.x, y: pos.y - s.y };
-                        setMode('sticker'); updateStickerControls(); render(); return;
+                        state.selectedStickerIndex = i; 
+                        state.isDraggingSticker = true; 
+                        state.dragOffset = { x: pos.x - s.x, y: pos.y - s.y };
+                        setMode('sticker'); 
+                        updateStickerControls(); 
+                        render(); 
+                        return;
                     }
                 }
 
+                if (state.activeMode === 'sticker' && state.selectedStickerIndex >= 0) {
+                    state.selectedStickerIndex = -1;
+                    updateStickerControls();
+                    render();
+                }
+
                 if (state.activeMode === 'draw') {
-                    isDrawing = true; saveHistory(); paintCtx.save(); applyWallClip(paintCtx);
-                    if (state.drawTool === 'magic') drawMagicSparkle(pos.x, pos.y, state.brushSize);
-                    else {
+                    isDrawing = true; 
+                    saveHistory(); 
+                    paintCtx.save(); 
+                    applyWallClip(paintCtx);
+                    if (state.drawTool === 'magic') {
+                        drawMagicSparkle(pos.x, pos.y, state.brushSize);
+                    } else {
                         paintCtx.globalCompositeOperation = state.drawTool === 'eraser' ? 'destination-out' : 'source-over';
-                        paintCtx.strokeStyle = state.currentColor; paintCtx.lineWidth = state.brushSize; paintCtx.lineCap = 'round';
-                        paintCtx.beginPath(); paintCtx.moveTo(pos.x, pos.y); paintCtx.lineTo(pos.x, pos.y); paintCtx.stroke();
+                        paintCtx.strokeStyle = state.currentColor; 
+                        paintCtx.lineWidth = state.brushSize; 
+                        paintCtx.lineCap = 'round';
+                        paintCtx.lineJoin = 'round';
+                        paintCtx.beginPath(); 
+                        paintCtx.moveTo(pos.x, pos.y); 
+                        paintCtx.lineTo(pos.x, pos.y); 
+                        paintCtx.stroke();
                     }
                     render();
                 }
             });
 
-            canvas.addEventListener('mousemove', (e) => {
+            canvas.addEventListener('pointermove', (e) => {
+                if (!state.isDraggingSticker && !isDrawing) return;
                 const pos = getCanvasCoords(e);
+
                 if (state.isDraggingSticker && state.selectedStickerIndex >= 0) {
                     state.stickers[state.selectedStickerIndex].x = pos.x - state.dragOffset.x;
                     state.stickers[state.selectedStickerIndex].y = pos.y - state.dragOffset.y;
                     render();
                 } else if (isDrawing && state.activeMode === 'draw') {
-                    if (state.drawTool === 'magic') drawMagicSparkle(pos.x, pos.y, state.brushSize);
-                    else { paintCtx.lineTo(pos.x, pos.y); paintCtx.stroke(); }
+                    if (state.drawTool === 'magic') {
+                        drawMagicSparkle(pos.x, pos.y, state.brushSize);
+                    } else { 
+                        paintCtx.lineTo(pos.x, pos.y); 
+                        paintCtx.stroke(); 
+                    }
                     render();
                 }
             });
 
-            window.addEventListener('mouseup', () => {
+            const stopInteraction = (e) => {
+                if (e.pointerId && canvas.hasPointerCapture(e.pointerId)) {
+                    canvas.releasePointerCapture(e.pointerId);
+                }
                 if (isDrawing) paintCtx.restore();
-                isDrawing = false; state.isDraggingSticker = false;
-            });
+                isDrawing = false; 
+                state.isDraggingSticker = false;
+            };
+
+            canvas.addEventListener('pointerup', stopInteraction);
+            canvas.addEventListener('pointercancel', stopInteraction);
         }
     </script>
 </body>
